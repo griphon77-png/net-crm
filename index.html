@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Моя сеть контактов</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f766e">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f2f4f6;--card:#fff;--ink:#1b2a3a;--mute:#66758a;--line:#d9e0e7;--acc:#0f766e;--accbg:#d9f0ec;--warn:#b45309;--warnbg:#fdecd3}
+@media(prefers-color-scheme:dark){:root{--bg:#121a22;--card:#1b2631;--ink:#e6edf3;--mute:#8fa0b3;--line:#2d3b4a;--acc:#4fd1c0;--accbg:#183a37;--warn:#f0b266;--warnbg:#3d2d17}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:14px 16px 0;position:sticky;top:0;background:var(--bg);z-index:5}
+h1{margin:0 0 2px;font-size:20px}
+.sub{color:var(--mute);font-size:13px;margin-bottom:10px}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav button{flex:1;padding:10px 4px;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;border-bottom:3px solid transparent;cursor:pointer}
+nav button.on{color:var(--acc);border-color:var(--acc)}
+main{padding:14px 16px 90px;max-width:760px;margin:auto}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+textarea{min-height:70px;resize:vertical}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 3px}
+button.b{padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+@media(prefers-color-scheme:dark){button.p{color:#06201d}}
+button.d{color:#b42318}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+.c{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
+.c b{font-size:17px}.c .m{color:var(--mute);font-size:14px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--accbg);color:var(--acc);margin:4px 4px 0 0}
+.tag.w{background:var(--warnbg);color:var(--warn)}
+.fab{position:fixed;right:16px;bottom:16px;width:56px;height:56px;border-radius:50%;font-size:30px;line-height:1;box-shadow:0 3px 10px #0004}
+.modal{position:fixed;inset:0;background:#0007;display:none;z-index:10;overflow:auto}
+.modal.on{display:block}
+.sheet{background:var(--bg);max-width:640px;margin:0 auto;min-height:100%;padding:14px 16px 40px}
+.log{border-left:3px solid var(--acc);padding:2px 0 2px 10px;margin:8px 0}
+.log small{color:var(--mute)}
+.tree ul{list-style:none;margin:0;padding-left:18px;border-left:2px solid var(--line)}
+.tree>ul{border:0;padding:0}
+.tree li{margin:6px 0}
+.tree a{color:var(--acc);cursor:pointer;font-weight:600}
+.empty{color:var(--mute);text-align:center;padding:36px 10px}
+.bar{display:flex;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+.note{font-size:13px;color:var(--mute);margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Моя сеть контактов</h1>
+  <div class="sub">Данные хранятся только в этом браузере на вашем устройстве</div>
+  <nav>
+    <button data-t="list" class="on">Контакты</button>
+    <button data-t="today">Пора связаться</button>
+    <button data-t="map">Карта</button>
+    <button data-t="tree">Цепочки</button>
+    <button data-t="goals">Цели</button>
+    <button data-t="data">Данные</button>
+  </nav>
+</header>
+<main id="main"></main>
+<button class="b p fab" id="add" aria-label="Добавить контакт">+</button>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const KEY='netcrm_v1';
+const STAGES=['Этап 1: налаживаю, пока нет стабильности','Этап 2: углубление, есть доверие'];
+const ROLES=['Коннектор (знакомит с людьми)','Конденсатор (накапливает информацию)','Привратник / мост (доступ к другим сетям)','Визионер (определяет будущее)','Восходящая звезда','Рядовой контакт'];
+const OPENS=['Великий коммуникатор','Любитель быть в центре внимания','Контролёр','Замкнутый'];
+const DEPTHS=['Знакомый','Приятель','Доверенный','Близкий'];
+const SPHERES=['Финансы','Карьера / бизнес','Здоровье','Семья','Личный рост','Другое'];
+const CIRCLES=['Круг поддержки','Круг продуктивности','Круг развития'];
+const DYN=['Приверженность и интенсивность общения','Инициатива и взаимность','Эмоциональная вовлечённость','Открытость и доверие'];
+let db={people:[],goals:[]},tab='list',q='',fs='',fc='';
+function load(){try{const r=localStorage.getItem(KEY);if(r)db=JSON.parse(r)}catch(e){}db.goals=db.goals||[]}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Не удалось сохранить. Сделайте экспорт во вкладке «Данные».')}}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const byId=id=>db.people.find(p=>p.id===id);
+const fmt=d=>d?d.split('-').reverse().join('.'):'';
+const days=d=>Math.round((new Date(d)-new Date(today()))/864e5);
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));render()});
+$('#add').onclick=()=>edit();
+
+function card(p){
+  const nx=p.next?days(p.next):null;
+  const rec=p.by&&byId(p.by)?byId(p.by).name:'';
+  return `<div class="c" onclick="view('${p.id}')"><b>${esc(p.name)}</b>
+  <div class="m">${esc([p.job,p.org].filter(Boolean).join(', '))}</div>
+  ${rec?`<div class="m">Рекомендовал(а): ${esc(rec)}</div>`:''}
+  <div>${p.circle?`<span class="tag">${esc(p.circle)}</span>`:''}${p.stage?`<span class="tag">${esc(p.stage)}</span>`:''}${p.role&&p.role!==ROLES[5]?`<span class="tag">${esc(p.role.split(' (')[0])}</span>`:''}${nx!==null&&nx<=0?`<span class="tag w">связаться ${nx<0?'(просрочено)':'сегодня'}</span>`:''}</div></div>`;
+}
+function render(){
+  const m=$('#main');
+  if(tab==='list'){
+    let ps=db.people.filter(p=>(!fs||p.stage===fs)&&(!fc||p.circle===fc)&&(!q||JSON.stringify(p).toLowerCase().includes(q.toLowerCase())));
+    ps.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+    m.innerHTML=`<input id="q" placeholder="Поиск по имени, интересам, заметкам" value="${esc(q)}">
+    <div class="row" style="margin-top:8px"><select id="fs"><option value="">Все стадии</option>${STAGES.map(s=>`<option ${s===fs?'selected':''}>${s}</option>`).join('')}</select>
+    <select id="fc"><option value="">Все круги</option>${CIRCLES.map(s=>`<option ${s===fc?'selected':''}>${s}</option>`).join('')}</select></div>
+    ${ps.length?ps.map(card).join(''):`<div class="empty">${db.people.length?'Ничего не найдено':'Контактов пока нет. Нажмите «+», чтобы добавить первый.'}</div>`}`;
+    const qi=$('#q');qi.oninput=e=>{q=e.target.value;const pos=qi.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(pos,pos)};
+    $('#fs').onchange=e=>{fs=e.target.value;render()};$('#fc').onchange=e=>{fc=e.target.value;render()};
+  }
+  if(tab==='today'){
+    const ps=db.people.filter(p=>p.next&&days(p.next)<=7).sort((a,b)=>a.next.localeCompare(b.next));
+    const st=db.people.filter(p=>!(p.next&&days(p.next)<=7)&&(p.last||p.added)&&days(p.last||p.added)<-180);
+    const stHtml=st.length?`<h3>Давно нет связи (больше 6 месяцев)</h3><div class="sub">Решите: возобновить контакт или убрать из активной сети</div>`+st.map(card).join(''):'';
+    m.innerHTML=(ps.length?`<div class="sub">Просроченные и назначенные на ближайшие 7 дней</div>`+ps.map(p=>card(p)+`<div class="m" style="margin:-4px 0 8px 4px">Дата: ${fmt(p.next)}${p.nextWhy?' — '+esc(p.nextWhy):''}</div>`).join(''):'<div class="empty">Нет контактов, с которыми пора связаться. Назначайте дату следующего контакта в карточке.</div>')+stHtml;
+  }
+  if(tab==='tree'){
+    const kids=id=>db.people.filter(p=>(p.by||'')===id&&p.id!==id);
+    const node=p=>`<li><a onclick="view('${p.id}')">${esc(p.name)}</a>${p.circle?` <span class="tag">${esc(p.circle)}</span>`:''}${kids(p.id).length?`<ul>${kids(p.id).map(node).join('')}</ul>`:''}</li>`;
+    const roots=db.people.filter(p=>!p.by||!byId(p.by));
+    m.innerHTML=db.people.length?`<div class="sub">Кто кого рекомендовал. Верхний уровень — знакомства «без рекомендателя».</div><div class="tree"><ul>${roots.map(node).join('')}</ul></div>`:'<div class="empty">Добавьте контакты, и здесь появятся цепочки рекомендаций.</div>';
+  }
+  if(tab==='map'){
+    const R=[55,115,180],ring=p=>p.circle===CIRCLES[0]?0:p.circle===CIRCLES[1]?1:2;
+    const score=p=>[1,2,3,4].reduce((a,i)=>a+(+p['d'+i]||0),0);
+    let svg='',dots='';
+    R.slice().reverse().forEach((r,i)=>svg+=`<circle cx="200" cy="200" r="${r}" fill="none" stroke="var(--line)" stroke-width="1.5"/>`);
+    [0,1,2].forEach(k=>{const g=db.people.filter(p=>ring(p)===k);g.forEach((p,i)=>{
+      const a=(i/g.length)*6.283+k*0.7,r=k===0?R[0]-22:R[k]-28+(i%2?10:-4),x=200+r*Math.cos(a),y=200+r*Math.sin(a),sz=4+score(p)/2.5,w=+p.d1>=2?2.5:+p.d1===1?1.2:0.8;
+      dots+=`<line x1="200" y1="200" x2="${x}" y2="${y}" stroke="var(--acc)" stroke-width="${w}" ${+p.d1>=1?'':'stroke-dasharray="3 3"'} opacity=".45"/>`;
+      dots+=`<g onclick="view('${p.id}')" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${sz}" fill="var(--acc)"/><text x="${x}" y="${y-sz-3}" text-anchor="middle" font-size="9.5" fill="var(--ink)">${esc(p.name.split(' ')[0])}</text></g>`})});
+    m.innerHTML=`<div class="sub">Карта сети: в центре вы. Ближний круг — поддержка, средний — продуктивность, внешний — развитие. Размер точки — сумма оценок динамики, толщина линии — интенсивность общения. Контакты без круга показаны во внешнем кольце.</div>
+    <svg viewBox="0 0 400 400" style="width:100%;max-width:560px;display:block;margin:auto">${svg}<circle cx="200" cy="200" r="7" fill="var(--ink)"/><text x="200" y="222" text-anchor="middle" font-size="10" fill="var(--ink)">Я</text>${dots}</svg>`;
+  }
+  if(tab==='goals'){
+    m.innerHTML=`<div class="sub">Цель по схеме «Что — Кто/где — Как»: чего хотите, какие люди или места помогут, каким способом выйти на них.</div>
+    <div class="bar"><button class="b p" onclick="editGoal()">Добавить цель</button></div>
+    ${db.goals.length?db.goals.map((g,i)=>`<div class="c" onclick="editGoal(${i})"><span class="tag">${esc(g.sphere)}</span><div><b>Что:</b> ${esc(g.what)}</div><div class="m"><b>Кто/где:</b> ${esc(g.who)}</div><div class="m"><b>Как:</b> ${esc(g.how)}</div></div>`).join(''):'<div class="empty">Целей пока нет.</div>'}`;
+  }
+  if(tab==='data'){
+    m.innerHTML=`<p>Контактов: <b>${db.people.length}</b>. Информация нигде, кроме этого браузера, не хранится и никуда не отправляется.</p>
+    <div class="bar"><button class="b p" onclick="exportJson()">Сохранить резервную копию (JSON)</button><button class="b" onclick="exportCsv()">Выгрузить в таблицу (CSV)</button></div>
+    <label>Восстановить из резервной копии</label><input type="file" id="imp" accept=".json">
+    <p class="note">Если очистить данные браузера или сменить телефон, контакты пропадут. Делайте резервную копию после крупных изменений и храните файл у себя.</p>
+    <div class="bar"><button class="b d" onclick="wipe()">Удалить все данные</button></div>`;
+    $('#imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.people))throw 0;if(confirm('Заменить текущие данные ('+db.people.length+') на '+d.people.length+' контактов из файла?')){db=d;save();render()}}catch(x){alert('Файл не подходит')}};r.readAsText(f)};
+  }
+}
+function view(id){
+  const p=byId(id);if(!p)return;
+  const rec=p.by&&byId(p.by);const kids=db.people.filter(x=>x.by===id);
+  const row=(l,v)=>v?`<label>${l}</label><div>${esc(v).replace(/\n/g,'<br>')}</div>`:'';
+  open_(`<div class="bar"><button class="b" onclick="closeM()">← Назад</button><button class="b" onclick="edit('${id}')">Изменить</button></div>
+  <h2 style="margin:6px 0">${esc(p.name)}</h2><div class="m">${esc([p.job,p.org].filter(Boolean).join(', '))}</div>
+  <div>${p.circle?`<span class="tag">${esc(p.circle)}</span>`:''}${p.stage?`<span class="tag">${esc(p.stage)}</span>`:''}</div>
+  ${row('Телефон',p.phone)}${row('Почта / мессенджер',p.contact)}${row('Где и как познакомились',p.where)}
+  ${rec?`<label>Рекомендовал(а)</label><div><a style="color:var(--acc)" href="#" onclick="view('${rec.id}');return false">${esc(rec.name)}</a></div>`:''}
+  ${kids.length?`<label>Через этого человека познакомился с</label><div>${kids.map(k=>`<a style="color:var(--acc)" href="#" onclick="view('${k.id}');return false">${esc(k.name)}</a>`).join(', ')}</div>`:''}
+  ${row('Роль в моей сети',p.role)}${row('Тип по открытости',p.open)}${[1,2,3,4].some(i=>p['d'+i]!==undefined&&p['d'+i]!=='')?`<label>Динамика отношений (0–3)</label><div class="m">${DYN.map((n,i)=>n+': <b>'+(p['d'+(i+1)]||0)+'</b>').join('<br>')}</div>${(p.hist||[]).length>1?`<div class="m">Сумма по датам: ${p.hist.map(h=>fmt(h.d)+' — '+h.s).join('; ')}</div>`:''}`:''}${row('Сортировка ОИС',[p.o1&&'опасен',p.o2&&'интересен',p.o3&&'сложен'].filter(Boolean).join(', '))}${row('Видение отношений: чего жду и что могу предложить',p.vision)}${row('Что связывает',[p.c1&&'общие интересы',p.c2&&'эмоциональное сопереживание',p.c3&&'общий круг общения'].filter(Boolean).join(', '))}${row('Что обмениваемся ценного',p.exch)}${row('Интересы, увлечения',p.interests)}${row('Чем может быть полезен мне',p.gets)}${row('Чем могу быть полезен ему/ей',p.gives)}
+  ${row('Кого может порекомендовать',p.intro)}${row('Заметки',p.notes)}
+  ${p.next?`<label>Следующий контакт</label><div>${fmt(p.next)}${p.nextWhy?' — '+esc(p.nextWhy):''}</div>`:''}
+  <label>История общения</label>
+  <div class="row"><input type="date" id="ld" value="${today()}" style="max-width:150px"><input id="lt" placeholder="О чём говорили, о чём договорились"><button class="b p" style="flex:0" onclick="addLog('${id}')">Добавить</button></div>
+  ${(p.log||[]).slice().sort((a,b)=>b.d.localeCompare(a.d)).map(l=>`<div class="log"><small>${fmt(l.d)}</small><br>${esc(l.t)}</div>`).join('')||'<div class="note">Записей пока нет.</div>'}`);
+}
+function editGoal(i){const g=i!==undefined?db.goals[i]:{};
+  open_(`<div class="bar"><button class="b" onclick="closeM()">Отмена</button><button class="b p" onclick="saveGoal(${i===undefined?-1:i})">Сохранить</button></div><h2>Цель</h2>
+  <label>Сфера жизни</label><select id="gs">${SPHERES.map(s=>`<option ${s===g.sphere?'selected':''}>${s}</option>`).join('')}</select>
+  <label>Что (чего хочу достичь)</label><textarea id="gw">${esc(g.what)}</textarea>
+  <label>Кто / где (какие люди, организации, места помогут)</label><textarea id="gh">${esc(g.who)}</textarea>
+  <label>Как (как выйти на них, через кого)</label><textarea id="gk">${esc(g.how)}</textarea>
+  ${i!==undefined?`<div class="bar"><button class="b d" onclick="db.goals.splice(${i},1);save();closeM()">Удалить цель</button></div>`:''}`)}
+function saveGoal(i){const g={sphere:$('#gs').value,what:$('#gw').value.trim(),who:$('#gh').value.trim(),how:$('#gk').value.trim()};if(!g.what){alert('Опишите цель');return}if(i<0)db.goals.push(g);else db.goals[i]=g;save();closeM()}
+function addLog(id){const t=$('#lt').value.trim();if(!t)return;const p=byId(id);(p.log=p.log||[]).push({d:$('#ld').value||today(),t});p.last=$('#ld').value||today();save();view(id)}
+function edit(id){
+  const p=id?byId(id):{};const o=db.people.filter(x=>x.id!==id).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const f=(k,l,t='input')=>t==='ta'?`<label>${l}</label><textarea data-k="${k}">${esc(p[k])}</textarea>`:`<label>${l}</label><input data-k="${k}" value="${esc(p[k])}">`;
+  open_(`<div class="bar"><button class="b" onclick="${id?`view('${id}')`:'closeM()'}">Отмена</button><button class="b p" onclick="saveP('${id||''}')">Сохранить</button></div>
+  <h2 style="margin:6px 0">${id?'Изменить контакт':'Новый контакт'}</h2>
+  ${f('name','Имя *')}${f('job','Должность')}${f('org','Организация')}
+  <div class="row"><div>${f('phone','Телефон')}</div><div>${f('contact','Почта / мессенджер')}</div></div>
+  ${f('where','Где и как познакомились')}
+  <label>Кто порекомендовал</label><select data-k="by"><option value="">— никто / сам познакомился —</option>${o.map(x=>`<option value="${x.id}" ${x.id===p.by?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+  <div class="row"><div><label>Круг</label><select data-k="circle"><option value=""></option>${CIRCLES.map(s=>`<option ${s===p.circle?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div><label>Стадия отношений</label><select data-k="stage"><option value=""></option>${STAGES.map(s=>`<option ${s===p.stage?'selected':''}>${s}</option>`).join('')}</select></div></div>
+  <div class="row"><div><label>Роль в моей сети</label><select data-k="role"><option value=""></option>${ROLES.map(s=>`<option ${s===p.role?'selected':''}>${s}</option>`).join('')}</select></div>
+  <div><label>Тип по открытости</label><select data-k="open"><option value=""></option>${OPENS.map(s=>`<option ${s===p.open?'selected':''}>${s}</option>`).join('')}</select></div></div>
+  <label>Динамика отношений: оцените после каждой встречи от 0 до 3</label><div class="row">${DYN.map((n,i)=>`<div><label style="margin:0;font-size:12px">${n}</label><select data-k="d${i+1}"><option value=""></option>${[0,1,2,3].map(v=>`<option ${String(p['d'+(i+1)])===String(v)?'selected':''}>${v}</option>`).join('')}</select></div>`).join('')}</div>
+  <label>Сортировка при знакомстве (ОИС)</label><div class="row" style="gap:14px"><label style="margin:0"><input type="checkbox" data-k="o1" style="width:auto" ${p.o1?'checked':''}> опасен?</label><label style="margin:0"><input type="checkbox" data-k="o2" style="width:auto" ${p.o2?'checked':''}> интересен?</label><label style="margin:0"><input type="checkbox" data-k="o3" style="width:auto" ${p.o3?'checked':''}> сложен?</label></div>
+  ${f('vision','Видение отношений: чего жду и что могу предложить','ta')}
+  <label>Что нас связывает</label><div class="row" style="gap:14px"><label style="margin:0"><input type="checkbox" data-k="c1" style="width:auto" ${p.c1?'checked':''}> общие интересы</label><label style="margin:0"><input type="checkbox" data-k="c2" style="width:auto" ${p.c2?'checked':''}> эмоциональное сопереживание</label><label style="margin:0"><input type="checkbox" data-k="c3" style="width:auto" ${p.c3?'checked':''}> общий круг общения</label></div>
+  ${f('exch','Какими ценностями обмениваемся (услуги, информация, связи)','ta')}
+  ${f('interests','Интересы, увлечения, семья','ta')}${f('gets','Чем может быть полезен мне','ta')}${f('gives','Чем могу быть полезен ему/ей','ta')}${f('intro','Кого может порекомендовать','ta')}${f('notes','Заметки','ta')}
+  <div class="row"><div><label>Следующий контакт</label><input type="date" data-k="next" value="${esc(p.next)}"></div><div>${f('nextWhy','Повод')}</div></div>
+  ${id?`<div class="bar" style="margin-top:24px"><button class="b d" onclick="delP('${id}')">Удалить контакт</button></div>`:''}`);
+}
+function saveP(id){
+  const d={};document.querySelectorAll('#sheet [data-k]').forEach(e=>d[e.dataset.k]=e.type==='checkbox'?e.checked:e.value.trim());
+  if(!d.name){alert('Укажите имя');return}
+  let p=id?byId(id):null;
+  if(!p){p={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),log:[]};db.people.push(p);p.added=today();if(!d.next){const t=new Date();t.setDate(t.getDate()+2);d.next=t.toISOString().slice(0,10);d.nextWhy=d.nextWhy||'Вернуться к знакомству в течение 2 суток'}}
+  Object.assign(p,d);const sc=[1,2,3,4].reduce((a,i)=>a+(+d['d'+i]||0),0);if([1,2,3,4].some(i=>d['d'+i]!=='')){p.hist=p.hist||[];const l=p.hist[p.hist.length-1];if(!l||l.s!==sc){const t=today();if(l&&l.d===t)l.s=sc;else p.hist.push({d:t,s:sc})}}save();closeM();render();
+}
+function delP(id){const p=byId(id);if(!confirm('Удалить «'+p.name+'» вместе с историей?'))return;db.people=db.people.filter(x=>x.id!==id);db.people.forEach(x=>{if(x.by===id)x.by=''});save();closeM();render()}
+function open_(h){$('#sheet').innerHTML=h;$('#modal').classList.add('on');$('#modal').scrollTop=0}
+function closeM(){$('#modal').classList.remove('on');render()}
+function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
+function exportJson(){dl('сеть-контактов-'+today()+'.json',JSON.stringify(db,null,1),'application/json')}
+function exportCsv(){
+  const cols=[['name','Имя'],['job','Должность'],['org','Организация'],['phone','Телефон'],['contact','Почта/мессенджер'],['where','Где познакомились'],['by','Рекомендовал'],['circle','Круг'],['stage','Стадия'],['interests','Интересы'],['gets','Полезен мне'],['gives','Могу дать'],['intro','Может порекомендовать'],['next','След. контакт'],['notes','Заметки']];
+  const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows=[cols.map(x=>c(x[1])).join(';')].concat(db.people.map(p=>cols.map(([k])=>c(k==='by'?(byId(p.by)||{}).name:p[k])).join(';')));
+  dl('сеть-контактов-'+today()+'.csv','\uFEFF'+rows.join('\n'),'text/csv');
+}
+function wipe(){if(confirm('Удалить все контакты без возможности восстановления?')&&confirm('Точно удалить?')){db={people:[]};save();render()}}
+load();render();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+</script>
+</body>
+</html>
