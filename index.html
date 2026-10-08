@@ -16,8 +16,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-ap
 header{padding:14px 16px 0;position:sticky;top:0;background:var(--bg);z-index:5}
 h1{margin:0 0 2px;font-size:20px}
 .sub{color:var(--mute);font-size:13px;margin-bottom:10px}
-nav{display:flex;gap:4px;border-bottom:1px solid var(--line)}
-nav button{flex:1;padding:10px 4px;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;border-bottom:3px solid transparent;cursor:pointer}
+nav{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}h3{margin:20px 0 4px;font-size:16px}details{margin:10px 0}summary{cursor:pointer;color:var(--acc);font-weight:600}
+nav button{flex:0 0 auto;padding:10px 11px;white-space:nowrap;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;border-bottom:3px solid transparent;cursor:pointer}
 nav button.on{color:var(--acc);border-color:var(--acc)}
 main{padding:14px 16px 90px;max-width:760px;margin:auto}
 input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
@@ -57,6 +57,8 @@ button.d{color:#b42318}
     <button data-t="map">Карта</button>
     <button data-t="tree">Цепочки</button>
     <button data-t="goals">Цели</button>
+    <button data-t="orgs">Организации</button>
+    <button data-t="ladder">Статус</button>
     <button data-t="data">Данные</button>
   </nav>
 </header>
@@ -71,10 +73,24 @@ const ROLES=['Коннектор (знакомит с людьми)','Конде
 const OPENS=['Великий коммуникатор','Любитель быть в центре внимания','Контролёр','Замкнутый'];
 const DEPTHS=['Знакомый','Приятель','Доверенный','Близкий'];
 const SPHERES=['Финансы','Карьера / бизнес','Здоровье','Семья','Личный рост','Другое'];
+const HIER=['Вертикальная (жёсткая иерархия)','Смешанная','Горизонтальная / сетевая'];
+const DECS=['Один «царь» решает сам','Комитет (конкурирующие группы)','Бюрократический процесс'];
+const DECTIP=['Главное — выйти на этого человека и получить его личную поддержку.','Одного влиятельного сторонника мало: если часть комитета против, предложение не пройдёт. Нужна поддержка нескольких групп.','Решение складывается в долгом поэтапном процессе, личной ответственности ни у кого нет. Выясните, кто на каком этапе влияет.'];
+const POS=['Центр власти','Влиятельный инсайдер','Рядовой сотрудник'];
+const KRIT=['влияет на решения','инсайдер, связан с властными группами','есть потенциал роста','готов к близким отношениям'];
+const LADDER=[
+['1. Ближе к коннекторам','Станьте посредником и «менеджером по обмену» в своей организации или сообществе: места коннекторов часто свободны.'],
+['2. Консультативный совет','Окружите себя уважаемыми людьми, в том числе «восходящими звёздами». Формальная группа не нужна.'],
+['3. Реальные лидеры','Сблизьтесь с ключевыми фигурами сообщества и учитесь у них.'],
+['4. Образование','Любая программа повышает статус, а главная ценность — новые люди, с которыми вы знакомитесь.'],
+['5. Статусные группы','Профессиональные общества, клубы, мероприятия. Можно стать организатором событий.'],
+['6. Публичное пространство','Необычное дело, проект, блог или книга привлекают людей и дают внимание.'],
+['7. Помощь в решении значимых проблем','Участие в важных для города или организации делах приносит признание. Дело должно быть значимым, а не личной выгодой.'],
+['8. В движении','Поездки, смена среды, готовность к переменам и риску не дают «застояться» и расширяют сеть.']];
 const CIRCLES=['Круг поддержки','Круг продуктивности','Круг развития'];
 const DYN=['Приверженность и интенсивность общения','Инициатива и взаимность','Эмоциональная вовлечённость','Открытость и доверие'];
-let db={people:[],goals:[]},tab='list',q='',fs='',fc='';
-function load(){try{const r=localStorage.getItem(KEY);if(r)db=JSON.parse(r)}catch(e){}db.goals=db.goals||[]}
+let db={people:[],goals:[],orgs:[],ladder:{}},tab='list',q='',fs='',fc='';
+function load(){try{const r=localStorage.getItem(KEY);if(r)db=JSON.parse(r)}catch(e){}db.goals=db.goals||[];db.orgs=db.orgs||[];db.ladder=db.ladder||{}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Не удалось сохранить. Сделайте экспорт во вкладке «Данные».')}}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -130,6 +146,13 @@ function render(){
     m.innerHTML=`<div class="sub">Карта сети: в центре вы. Ближний круг — поддержка, средний — продуктивность, внешний — развитие. Размер точки — сумма оценок динамики, толщина линии — интенсивность общения. Контакты без круга показаны во внешнем кольце.</div>
     <svg viewBox="0 0 400 400" style="width:100%;max-width:560px;display:block;margin:auto">${svg}<circle cx="200" cy="200" r="7" fill="var(--ink)"/><text x="200" y="222" text-anchor="middle" font-size="10" fill="var(--ink)">Я</text>${dots}</svg>`;
   }
+  if(tab==='orgs'){
+    m.innerHTML=`<div class="sub">Карта организации: кто на самом деле принимает решения, через кого входить и кого беречь.</div><div class="bar"><button class="b p" onclick="editOrg()">Добавить организацию</button></div>`+(db.orgs.length?db.orgs.map((o,i)=>`<div class="c" onclick="viewOrg(${i})"><b>${esc(o.name)}</b><div class="m">${esc(o.goal||'')}</div><div>${o.dec?`<span class="tag">${esc(o.dec.split(' (')[0])}</span>`:''}<span class="tag">контактов: ${db.people.filter(p=>p.orgId===o.id).length}</span></div></div>`).join(''):'<div class="empty">Организаций пока нет. Добавьте ту, с которой хотите выстроить отношения.</div>');
+  }
+  if(tab==='ladder'){
+    const lst=(f,t)=>{const a=db.people.filter(f);return `<h3>${t}</h3>`+(a.length?a.map(card).join(''):'<div class="note">Пока никого. Отметьте в карточке контакта.</div>')};
+    m.innerHTML=`<div class="sub">Статус растёт вместе с социальным капиталом: доброжелательностью, признанием и помощью людей вокруг. Отметьте, что уже делаете, и запишите план.</div>`+LADDER.map((it,i)=>{const L=db.ladder[i]||{};return `<div class="c" style="cursor:default"><b>${it[0]}</b><div class="m">${it[1]}</div><select onchange="setLad(${i},'st',this.value)" style="margin-top:6px">${['Не начато','В работе','Сделано'].map(x=>`<option ${x===(L.st||'Не начато')?'selected':''}>${x}</option>`).join('')}</select><textarea placeholder="Что делаю или планирую" onchange="setLad(${i},'plan',this.value)" style="margin-top:6px">${esc(L.plan)}</textarea></div>`}).join('')+lst(p=>p.adv,'Мой консультативный совет')+lst(p=>p.lead,'Учусь у реальных лидеров')+lst(p=>p.role===ROLES[4],'Восходящие звёзды');
+  }
   if(tab==='goals'){
     m.innerHTML=`<div class="sub">Цель по схеме «Что — Кто/где — Как»: чего хотите, какие люди или места помогут, каким способом выйти на них.</div>
     <div class="bar"><button class="b p" onclick="editGoal()">Добавить цель</button></div>
@@ -154,7 +177,7 @@ function view(id){
   ${row('Телефон',p.phone)}${row('Почта / мессенджер',p.contact)}${row('Где и как познакомились',p.where)}
   ${rec?`<label>Рекомендовал(а)</label><div><a style="color:var(--acc)" href="#" onclick="view('${rec.id}');return false">${esc(rec.name)}</a></div>`:''}
   ${kids.length?`<label>Через этого человека познакомился с</label><div>${kids.map(k=>`<a style="color:var(--acc)" href="#" onclick="view('${k.id}');return false">${esc(k.name)}</a>`).join(', ')}</div>`:''}
-  ${row('Роль в моей сети',p.role)}${row('Тип по открытости',p.open)}${[1,2,3,4].some(i=>p['d'+i]!==undefined&&p['d'+i]!=='')?`<label>Динамика отношений (0–3)</label><div class="m">${DYN.map((n,i)=>n+': <b>'+(p['d'+(i+1)]||0)+'</b>').join('<br>')}</div>${(p.hist||[]).length>1?`<div class="m">Сумма по датам: ${p.hist.map(h=>fmt(h.d)+' — '+h.s).join('; ')}</div>`:''}`:''}${row('Сортировка ОИС',[p.o1&&'опасен',p.o2&&'интересен',p.o3&&'сложен'].filter(Boolean).join(', '))}${row('Видение отношений: чего жду и что могу предложить',p.vision)}${row('Что связывает',[p.c1&&'общие интересы',p.c2&&'эмоциональное сопереживание',p.c3&&'общий круг общения'].filter(Boolean).join(', '))}${row('Что обмениваемся ценного',p.exch)}${row('Интересы, увлечения',p.interests)}${row('Чем может быть полезен мне',p.gets)}${row('Чем могу быть полезен ему/ей',p.gives)}
+  ${row('Роль в моей сети',p.role)}${(()=>{const o=db.orgs.find(x=>x.id===p.orgId);return o?row('Организация',o.name+(p.unit?', '+p.unit:'')+(p.pos?' ('+p.pos+')':'')):''})()}${KRIT.some((_,j)=>p['k'+(j+1)])?row('Критерии влиятельной фигуры',KRIT.filter((_,j)=>p['k'+(j+1)]).join('; ')):''}${p.adv||p.lead?row('Статус',[p.adv&&'в моём консультативном совете',p.lead&&'учусь у него как у реального лидера'].filter(Boolean).join('; ')):''}${row('Тип по открытости',p.open)}${[1,2,3,4].some(i=>p['d'+i]!==undefined&&p['d'+i]!=='')?`<label>Динамика отношений (0–3)</label><div class="m">${DYN.map((n,i)=>n+': <b>'+(p['d'+(i+1)]||0)+'</b>').join('<br>')}</div>${(p.hist||[]).length>1?`<div class="m">Сумма по датам: ${p.hist.map(h=>fmt(h.d)+' — '+h.s).join('; ')}</div>`:''}`:''}${row('Сортировка ОИС',[p.o1&&'опасен',p.o2&&'интересен',p.o3&&'сложен'].filter(Boolean).join(', '))}${row('Видение отношений: чего жду и что могу предложить',p.vision)}${row('Что связывает',[p.c1&&'общие интересы',p.c2&&'эмоциональное сопереживание',p.c3&&'общий круг общения'].filter(Boolean).join(', '))}${row('Что обмениваемся ценного',p.exch)}${row('Интересы, увлечения',p.interests)}${row('Чем может быть полезен мне',p.gets)}${row('Чем могу быть полезен ему/ей',p.gives)}
   ${row('Кого может порекомендовать',p.intro)}${row('Заметки',p.notes)}
   ${p.next?`<label>Следующий контакт</label><div>${fmt(p.next)}${p.nextWhy?' — '+esc(p.nextWhy):''}</div>`:''}
   <label>История общения</label>
@@ -169,10 +192,55 @@ function editGoal(i){const g=i!==undefined?db.goals[i]:{};
   <label>Как (как выйти на них, через кого)</label><textarea id="gk">${esc(g.how)}</textarea>
   ${i!==undefined?`<div class="bar"><button class="b d" onclick="db.goals.splice(${i},1);save();closeM()">Удалить цель</button></div>`:''}`)}
 function saveGoal(i){const g={sphere:$('#gs').value,what:$('#gw').value.trim(),who:$('#gh').value.trim(),how:$('#gk').value.trim()};if(!g.what){alert('Опишите цель');return}if(i<0)db.goals.push(g);else db.goals[i]=g;save();closeM()}
+function setLad(i,k,v){db.ladder[i]=db.ladder[i]||{};db.ladder[i][k]=v;save()}
+function orgMap(o,ps){
+  const units=(o.units||'').split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean),n=Math.max(units.length,1),T=6.283,cnt={};
+  let s=`<circle cx="200" cy="200" r="180" fill="none" stroke="var(--line)" stroke-width="1.5"/><circle cx="200" cy="200" r="48" fill="var(--accbg)" stroke="var(--acc)"/><text x="200" y="197" text-anchor="middle" font-size="9" fill="var(--acc)">центр</text><text x="200" y="208" text-anchor="middle" font-size="9" fill="var(--acc)">власти</text>`;
+  units.forEach((u,k)=>{const a=k/n*T-1.57,am=(k+.5)/n*T-1.57;s+=`<line x1="${200+48*Math.cos(a)}" y1="${200+48*Math.sin(a)}" x2="${200+180*Math.cos(a)}" y2="${200+180*Math.sin(a)}" stroke="var(--line)"/><text x="${200+198*Math.cos(am)}" y="${200+198*Math.sin(am)}" text-anchor="middle" font-size="9.5" fill="var(--mute)">${esc(u)}</text>`});
+  const centre=ps.filter(p=>p.pos===POS[0]);
+  const put=(p,x,y,c)=>`<g onclick="view('${p.id}')" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="6" fill="${c}"/><text x="${x}" y="${y-9}" text-anchor="middle" font-size="9" fill="var(--ink)">${esc(p.name.split(' ')[0])}</text></g>`;
+  centre.forEach((p,i)=>{const a=i/centre.length*T;s+=put(p,200+(centre.length>1?22:0)*Math.cos(a),200+(centre.length>1?22:0)*Math.sin(a),'var(--warn)')});
+  ps.filter(p=>p.pos!==POS[0]).forEach(p=>{
+    const u=(p.unit||'').toLowerCase(),k=u?units.findIndex(x=>u.includes(x.toLowerCase())||x.toLowerCase().includes(u)):-1;
+    const key=k<0?'x':k;cnt[key]=(cnt[key]||0)+1;const j=cnt[key];
+    const a=k<0?(j*0.9):((k+Math.min(.15+j*.17,.9))/n*T-1.57),r=p.pos===POS[1]?(85+j%2*12):(135+j%2*14);
+    s+=put(p,200+r*Math.cos(a),200+r*Math.sin(a),k<0?'var(--mute)':'var(--acc)')});
+  return `<svg viewBox="-30 -10 460 420" style="width:100%;max-width:560px;display:block;margin:auto">${s}</svg>`;
+}
+function viewOrg(i){
+  const o=db.orgs[i],ps=db.people.filter(p=>p.orgId===o.id),has=r=>ps.some(p=>p.role===ROLES[r]),w=[];
+  if(ps.filter(p=>p.role===ROLES[2]).length<2)w.push('Меньше двух «мостов». Ищите дополнительный «мост»: если единственный помощник уйдёт или поссорится с руководством, вы потеряете доступ.');
+  if(!has(1))w.push('Нет «конденсатора» — инсайдера, который помнит историю организации и может стать вашим гидом.');
+  if(!has(3)&&!has(4))w.push('Нет «визионера» и «восходящей звезды»: для долгого влияния нужны те, кто определяет будущее организации и кто завтра придёт к власти.');
+  if(!ps.some(p=>p.pos===POS[0]))w.push('Никто не отмечен как центр власти. Пока не изучили реальную власть, считайте организацию «чёрным ящиком».');
+  const row=(l,v)=>v?`<label>${l}</label><div>${esc(v).replace(/\n/g,'<br>')}</div>`:'';
+  const di=DECS.indexOf(o.dec);
+  open_(`<div class="bar"><button class="b" onclick="closeM()">← Назад</button><button class="b" onclick="editOrg(${i})">Изменить</button></div>
+  <h2 style="margin:6px 0">${esc(o.name)}</h2><div>${o.hier?`<span class="tag">${esc(o.hier.split(' (')[0])}</span>`:''}${o.dec?`<span class="tag">${esc(o.dec.split(' (')[0])}</span>`:''}</div>
+  ${di>=0?`<div class="m" style="margin-top:6px">${DECTIP[di]}</div>`:''}
+  ${row('Чего хочу от организации',o.goal)}${row('Мой план входа: через кого, какой «мост»',o.plan)}${row('Конкурирующие группы власти',o.groups)}${row('Центр власти (если нет в контактах)',o.center)}${row('Заметки',o.notes)}
+  ${w.length?`<h3>На что обратить внимание</h3>`+w.map(x=>`<div class="c" style="cursor:default;border-color:var(--warn)">${x}</div>`).join(''):''}
+  <h3>Карта организации</h3>${ps.length?orgMap(o,ps):'<div class="note">Привяжите контакты к организации в их карточках, и здесь появится карта.</div>'}
+  <h3>Контакты в организации</h3>${ps.length?ps.map(p=>card(p)+`<div class="m" style="margin:-4px 0 8px 4px">${esc([p.pos,p.unit].filter(Boolean).join(', '))} · критерии влиятельной фигуры: ${KRIT.filter((_,j)=>p['k'+(j+1)]).length}/4</div>`).join(''):'<div class="note">Пока нет.</div>'}
+  <details><summary>Четыре типичные проблемы</summary><div class="m">1. Распыление времени на приятных, но не влиятельных людей. 2. Внезапная потеря сторонников: люди уходят и не предупреждают. 3. Зависть и ревность тех, кто вас привёл, поэтому пусть первые проводники сами ведут вас к новым контактам. 4. Втягивание в борьбу за власть: не позволяйте использовать себя как «наёмника».</div></details>
+  <div class="bar" style="margin-top:20px"><button class="b d" onclick="delOrg(${i})">Удалить организацию</button></div>`);
+}
+function editOrg(i){
+  const o=i!==undefined?db.orgs[i]:{};
+  const f=(k,l,t)=>t?`<label>${l}</label><textarea data-k="${k}">${esc(o[k])}</textarea>`:`<label>${l}</label><input data-k="${k}" value="${esc(o[k])}">`;
+  const sel=(k,l,a)=>`<label>${l}</label><select data-k="${k}"><option value=""></option>${a.map(x=>`<option ${x===o[k]?'selected':''}>${x}</option>`).join('')}</select>`;
+  open_(`<div class="bar"><button class="b" onclick="${i!==undefined?`viewOrg(${i})`:'closeM()'}">Отмена</button><button class="b p" onclick="saveOrg(${i===undefined?-1:i})">Сохранить</button></div><h2>Организация</h2>
+  ${f('name','Название *')}${sel('hier','Степень иерархии',HIER)}${sel('dec','Стиль принятия решений',DECS)}
+  ${f('goal','Чего хочу от организации','t')}${f('plan','Мой план входа: через кого, какой «мост»','t')}
+  ${f('units','Подразделения (секторы карты) через запятую')}${f('groups','Конкурирующие группы власти: кто с кем','t')}${f('center','Центр власти: кто принимает ключевые решения (если ещё нет в контактах)','t')}${f('notes','Заметки','t')}`);
+}
+function saveOrg(i){const d={};document.querySelectorAll('#sheet [data-k]').forEach(e=>d[e.dataset.k]=e.value.trim());if(!d.name){alert('Укажите название');return}
+  if(i<0)db.orgs.push(Object.assign({id:'o'+Date.now().toString(36)},d));else Object.assign(db.orgs[i],d);save();closeM()}
+function delOrg(i){if(!confirm('Удалить организацию? Контакты останутся.'))return;const id=db.orgs[i].id;db.people.forEach(p=>{if(p.orgId===id)p.orgId=''});db.orgs.splice(i,1);save();closeM()}
 function addLog(id){const t=$('#lt').value.trim();if(!t)return;const p=byId(id);(p.log=p.log||[]).push({d:$('#ld').value||today(),t});p.last=$('#ld').value||today();save();view(id)}
 function edit(id){
   const p=id?byId(id):{};const o=db.people.filter(x=>x.id!==id).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-  const f=(k,l,t='input')=>t==='ta'?`<label>${l}</label><textarea data-k="${k}">${esc(p[k])}</textarea>`:`<label>${l}</label><input data-k="${k}" value="${esc(p[k])}">`;
+  const cb=(k,l)=>`<label style="margin:0"><input type="checkbox" data-k="${k}" style="width:auto" ${p[k]?'checked':''}> ${l}</label>`;const f=(k,l,t='input')=>t==='ta'?`<label>${l}</label><textarea data-k="${k}">${esc(p[k])}</textarea>`:`<label>${l}</label><input data-k="${k}" value="${esc(p[k])}">`;
   open_(`<div class="bar"><button class="b" onclick="${id?`view('${id}')`:'closeM()'}">Отмена</button><button class="b p" onclick="saveP('${id||''}')">Сохранить</button></div>
   <h2 style="margin:6px 0">${id?'Изменить контакт':'Новый контакт'}</h2>
   ${f('name','Имя *')}${f('job','Должность')}${f('org','Организация')}
@@ -188,6 +256,11 @@ function edit(id){
   ${f('vision','Видение отношений: чего жду и что могу предложить','ta')}
   <label>Что нас связывает</label><div class="row" style="gap:14px"><label style="margin:0"><input type="checkbox" data-k="c1" style="width:auto" ${p.c1?'checked':''}> общие интересы</label><label style="margin:0"><input type="checkbox" data-k="c2" style="width:auto" ${p.c2?'checked':''}> эмоциональное сопереживание</label><label style="margin:0"><input type="checkbox" data-k="c3" style="width:auto" ${p.c3?'checked':''}> общий круг общения</label></div>
   ${f('exch','Какими ценностями обмениваемся (услуги, информация, связи)','ta')}
+  <h3>В организации и в статусе</h3>
+  <label>Организация (из раздела «Организации»)</label><select data-k="orgId"><option value="">—</option>${db.orgs.map(o=>`<option value="${o.id}" ${o.id===p.orgId?'selected':''}>${esc(o.name)}</option>`).join('')}</select>
+  <div class="row"><div>${f('unit','Подразделение (сектор)')}</div><div><label>Реальное положение</label><select data-k="pos"><option value=""></option>${POS.map(x=>`<option ${x===p.pos?'selected':''}>${x}</option>`).join('')}</select></div></div>
+  <label>Критерии влиятельной фигуры</label><div class="row" style="gap:12px;flex-direction:column">${KRIT.map((t,j)=>cb('k'+(j+1),t)).join('')}</div>
+  <div class="row" style="gap:12px;flex-direction:column;margin-top:10px">${cb('adv','в моём консультативном совете')}${cb('lead','учусь у него как у реального лидера')}</div>
   ${f('interests','Интересы, увлечения, семья','ta')}${f('gets','Чем может быть полезен мне','ta')}${f('gives','Чем могу быть полезен ему/ей','ta')}${f('intro','Кого может порекомендовать','ta')}${f('notes','Заметки','ta')}
   <div class="row"><div><label>Следующий контакт</label><input type="date" data-k="next" value="${esc(p.next)}"></div><div>${f('nextWhy','Повод')}</div></div>
   ${id?`<div class="bar" style="margin-top:24px"><button class="b d" onclick="delP('${id}')">Удалить контакт</button></div>`:''}`);
