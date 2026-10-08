@@ -50,7 +50,7 @@ button.d{color:#b42318}
 <body>
 <header>
   <h1>Моя сеть контактов</h1>
-  <div class="sub">Данные хранятся только в этом браузере на вашем устройстве</div>
+  <div class="sub">Данные принадлежат только вам: на устройстве и в вашем зашифрованном хранилище</div>
   <nav>
     <button data-t="list" class="on">Контакты</button>
     <button data-t="today">Пора связаться</button>
@@ -90,8 +90,8 @@ const LADDER=[
 const CIRCLES=['Круг поддержки','Круг продуктивности','Круг развития'];
 const DYN=['Приверженность и интенсивность общения','Инициатива и взаимность','Эмоциональная вовлечённость','Открытость и доверие'];
 let db={people:[],goals:[],orgs:[],ladder:{}},tab='list',q='',fs='',fc='';
-function load(){try{const r=localStorage.getItem(KEY);if(r)db=JSON.parse(r)}catch(e){}db.goals=db.goals||[];db.orgs=db.orgs||[];db.ladder=db.ladder||{}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Не удалось сохранить. Сделайте экспорт во вкладке «Данные».')}}
+function load(){try{const r=localStorage.getItem(KEY);if(r)db=JSON.parse(r)}catch(e){}db.goals=db.goals||[];db.orgs=db.orgs||[];db.ladder=db.ladder||{};db.del=db.del||{};db.goals.forEach(g=>{if(!g.id)g.id='g'+Math.random().toString(36).slice(2,9)})}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Не удалось сохранить. Сделайте экспорт во вкладке «Данные».')}queueSync()}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today=()=>new Date().toISOString().slice(0,10);
@@ -159,12 +159,27 @@ function render(){
     ${db.goals.length?db.goals.map((g,i)=>`<div class="c" onclick="editGoal(${i})"><span class="tag">${esc(g.sphere)}</span><div><b>Что:</b> ${esc(g.what)}</div><div class="m"><b>Кто/где:</b> ${esc(g.who)}</div><div class="m"><b>Как:</b> ${esc(g.how)}</div></div>`).join(''):'<div class="empty">Целей пока нет.</div>'}`;
   }
   if(tab==='data'){
-    m.innerHTML=`<p>Контактов: <b>${db.people.length}</b>. Информация нигде, кроме этого браузера, не хранится и никуда не отправляется.</p>
+    const c=scfg();
+    m.innerHTML=`<p>Контактов: <b>${db.people.length}</b>.</p>
+    <h3>Синхронизация между устройствами</h3>
+    <div class="note" style="margin-top:0">Данные шифруются на вашем устройстве вашим паролем и хранятся в вашем закрытом репозитории GitHub. Без пароля их не прочитать. Токен и пароль хранятся только на ваших устройствах.</div>
+    <label>Репозиторий для данных (владелец/название)</label><input id="sr" placeholder="griphon77-png/net-crm-data" value="${esc(c.repo)}">
+    <label>Токен доступа GitHub</label><input id="stk" type="password" placeholder="${c.token?'сохранён, оставьте пустым чтобы не менять':'github_pat_…'}">
+    <label>Пароль шифрования (один и тот же на всех устройствах)</label><input id="spw" type="password" placeholder="${c.pass?'сохранён, оставьте пустым чтобы не менять':'придумайте и запомните'}">
+    <div class="bar"><button class="b p" onclick="saveSync()">Сохранить и синхронизировать</button>${c.repo?'<button class="b" onclick="syncNow(false)">Синхронизировать сейчас</button><button class="b d" onclick="clearSync()">Отключить</button>':''}</div>
+    <div class="m" id="syncst">${esc(syncMsg||(c.repo?'Синхронизация включена':'Синхронизация не настроена'))}</div>
+    <details><summary>Как настроить синхронизацию</summary><div class="m">
+    1. На github.com создайте <b>второй</b> репозиторий, например <b>net-crm-data</b>, с видимостью <b>Private</b>, и отметьте «Add a README file».<br>
+    2. Откройте аватар → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Срок действия — 1 год. В Repository access выберите «Only select repositories» и укажите net-crm-data. В Repository permissions для Contents выберите «Read and write». Создайте токен и сразу скопируйте его (начинается с github_pat_).<br>
+    3. Вставьте сюда репозиторий, токен и придуманный пароль, нажмите «Сохранить и синхронизировать».<br>
+    4. На другом устройстве откройте приложение, введите те же три значения и нажмите «Сохранить и синхронизировать». Контакты подтянутся.<br>
+    Пароль потерять нельзя: восстановить данные в облаке без него невозможно. Если устройство потеряно, удалите токен в настройках GitHub.</div></details>
+    <h3>Резервная копия</h3>
     <div class="bar"><button class="b p" onclick="exportJson()">Сохранить резервную копию (JSON)</button><button class="b" onclick="exportCsv()">Выгрузить в таблицу (CSV)</button></div>
     <label>Восстановить из резервной копии</label><input type="file" id="imp" accept=".json">
-    <p class="note">Если очистить данные браузера или сменить телефон, контакты пропадут. Делайте резервную копию после крупных изменений и храните файл у себя.</p>
+    <p class="note">Без синхронизации при очистке данных браузера или смене телефона контакты пропадут. Делайте резервную копию после крупных изменений и храните файл у себя.</p>
     <div class="bar"><button class="b d" onclick="wipe()">Удалить все данные</button></div>`;
-    $('#imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.people))throw 0;if(confirm('Заменить текущие данные ('+db.people.length+') на '+d.people.length+' контактов из файла?')){db=d;save();render()}}catch(x){alert('Файл не подходит')}};r.readAsText(f)};
+    $('#imp').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.people))throw 0;if(confirm('Заменить текущие данные ('+db.people.length+') на '+d.people.length+' контактов из файла?')){adoptImport(d);save();render()}}catch(x){alert('Файл не подходит')}};r.readAsText(f)};
   }
 }
 function view(id){
@@ -190,9 +205,64 @@ function editGoal(i){const g=i!==undefined?db.goals[i]:{};
   <label>Что (чего хочу достичь)</label><textarea id="gw">${esc(g.what)}</textarea>
   <label>Кто / где (какие люди, организации, места помогут)</label><textarea id="gh">${esc(g.who)}</textarea>
   <label>Как (как выйти на них, через кого)</label><textarea id="gk">${esc(g.how)}</textarea>
-  ${i!==undefined?`<div class="bar"><button class="b d" onclick="db.goals.splice(${i},1);save();closeM()">Удалить цель</button></div>`:''}`)}
-function saveGoal(i){const g={sphere:$('#gs').value,what:$('#gw').value.trim(),who:$('#gh').value.trim(),how:$('#gk').value.trim()};if(!g.what){alert('Опишите цель');return}if(i<0)db.goals.push(g);else db.goals[i]=g;save();closeM()}
-function setLad(i,k,v){db.ladder[i]=db.ladder[i]||{};db.ladder[i][k]=v;save()}
+  ${i!==undefined?`<div class="bar"><button class="b d" onclick="delGoal(${i})">Удалить цель</button></div>`:''}`)}
+function saveGoal(i){const g={sphere:$('#gs').value,what:$('#gw').value.trim(),who:$('#gh').value.trim(),how:$('#gk').value.trim()};if(!g.what){alert('Опишите цель');return}g.u=Date.now();if(i<0){g.id='g'+Date.now().toString(36);db.goals.push(g)}else{g.id=db.goals[i].id;db.goals[i]=g}save();closeM()}
+const SKEY='netcrm_sync';
+function scfg(){try{return JSON.parse(localStorage.getItem(SKEY)||'{}')}catch(e){return{}}}
+const b64=u=>{let t='';u.forEach(c=>t+=String.fromCharCode(c));return btoa(t)};
+const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function keyFrom(pass,salt){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function enc(obj,pass){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await keyFrom(pass,salt);const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(obj))));return JSON.stringify({v:1,salt:b64(salt),iv:b64(iv),data:b64(ct)})}
+async function dec(txt,pass){const j=JSON.parse(txt),key=await keyFrom(pass,unb64(j.salt));try{return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(j.iv)},key,unb64(j.data))))}catch(e){throw new Error('Неверный пароль шифрования или файл повреждён')}}
+function mergeDb(r){
+  r.del=r.del||{};const D=Object.assign({},r.del);for(const k in db.del)D[k]=Math.max(D[k]||0,db.del[k]);
+  ['people','orgs','goals'].forEach(col=>{const mp={};(r[col]||[]).forEach(x=>mp[x.id]=x);(db[col]||[]).forEach(x=>{const y=mp[x.id];if(!y||(x.u||0)>=(y.u||0))mp[x.id]=x});db[col]=Object.values(mp).filter(x=>!(D[x.id]>(x.u||0)))});
+  if((r.ladderU||0)>(db.ladderU||0)){db.ladder=r.ladder||{};db.ladderU=r.ladderU}
+  db.del=D;
+}
+function adoptImport(d){
+  d.orgs=d.orgs||[];d.goals=d.goals||[];d.ladder=d.ladder||{};const t=Date.now(),D=Object.assign({},db.del,d.del||{});
+  d.goals.forEach(g=>{if(!g.id)g.id='g'+Math.random().toString(36).slice(2,9)});
+  const keep=new Set([...d.people,...d.orgs,...d.goals].map(x=>x.id));
+  [...db.people,...db.orgs,...db.goals].forEach(x=>{if(!keep.has(x.id))D[x.id]=t});
+  [...d.people,...d.orgs,...d.goals].forEach(x=>{x.u=t;delete D[x.id]});
+  d.del=D;d.ladderU=t;db=d;
+}
+let syncing=false,syncT=null,syncMsg='';
+function setMsg(t){syncMsg=t;const e=document.querySelector('#syncst');if(e)e.textContent=t}
+function queueSync(){const c=scfg();if(!c.repo||!c.token||!c.pass||syncing)return;clearTimeout(syncT);syncT=setTimeout(()=>syncNow(true),5000)}
+async function ghApi(method,body){const c=scfg();return fetch('https://api.github.com/repos/'+c.repo+'/contents/data.enc.json',{method,headers:{Authorization:'Bearer '+c.token,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined})}
+async function syncNow(silent){
+  const c=scfg();if(!c.repo||!c.token||!c.pass){if(!silent)setMsg('Заполните репозиторий, токен и пароль');return}
+  if(syncing)return;syncing=true;clearTimeout(syncT);setMsg('Синхронизация…');
+  try{
+    let done=false;
+    for(let a=0;a<3&&!done;a++){
+      const r=await ghApi('GET');let sha;
+      if(r.status===200){const j=await r.json();sha=j.sha;mergeDb(await dec(new TextDecoder().decode(unb64(j.content.replace(/\s/g,''))),c.pass))}
+      else if(r.status===401||r.status===403)throw new Error('Токен не подошёл или у него нет доступа к репозиторию');
+      else if(r.status!==404)throw new Error('GitHub ответил кодом '+r.status);
+      const body={message:'sync',content:btoa(await enc(db,c.pass))};if(sha)body.sha=sha;
+      const w=await ghApi('PUT',body);
+      if(w.status===200||w.status===201)done=true;
+      else if(w.status===409||w.status===422)continue;
+      else if(w.status===404)throw new Error('Репозиторий не найден или у токена нет права записи (Contents: Read and write)');
+      else if(w.status===401||w.status===403)throw new Error('Токен не подошёл или у него нет права записи');
+      else throw new Error('GitHub ответил кодом '+w.status);
+    }
+    if(!done)throw new Error('Не удалось записать: данные менялись одновременно, повторите');
+    try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}
+    if(!document.querySelector('#modal').classList.contains('on'))render();
+    setMsg('Синхронизировано в '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){setMsg('Ошибка: '+(/fetch/i.test(e.message)?'нет связи с GitHub':e.message))}
+  finally{syncing=false}
+}
+function saveSync(){const c=scfg();const n={repo:$('#sr').value.trim()||c.repo,token:$('#stk').value.trim()||c.token,pass:$('#spw').value||c.pass};
+  if(!/^[\w.-]+\/[\w.-]+$/.test(n.repo||'')){setMsg('Репозиторий укажите в виде владелец/название');return}
+  localStorage.setItem(SKEY,JSON.stringify(n));syncNow(false)}
+function clearSync(){if(!confirm('Отключить синхронизацию на этом устройстве? Данные на устройстве и в облаке останутся.'))return;localStorage.removeItem(SKEY);render();setMsg('Синхронизация отключена')}
+function setLad(i,k,v){db.ladder[i]=db.ladder[i]||{};db.ladder[i][k]=v;db.ladderU=Date.now();save()}
+function delGoal(i){db.del[db.goals[i].id]=Date.now();db.goals.splice(i,1);save();closeM()}
 function orgMap(o,ps){
   const units=(o.units||'').split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean),n=Math.max(units.length,1),T=6.283,cnt={};
   let s=`<circle cx="200" cy="200" r="180" fill="none" stroke="var(--line)" stroke-width="1.5"/><circle cx="200" cy="200" r="48" fill="var(--accbg)" stroke="var(--acc)"/><text x="200" y="197" text-anchor="middle" font-size="9" fill="var(--acc)">центр</text><text x="200" y="208" text-anchor="middle" font-size="9" fill="var(--acc)">власти</text>`;
@@ -235,9 +305,9 @@ function editOrg(i){
   ${f('units','Подразделения (секторы карты) через запятую')}${f('groups','Конкурирующие группы власти: кто с кем','t')}${f('center','Центр власти: кто принимает ключевые решения (если ещё нет в контактах)','t')}${f('notes','Заметки','t')}`);
 }
 function saveOrg(i){const d={};document.querySelectorAll('#sheet [data-k]').forEach(e=>d[e.dataset.k]=e.value.trim());if(!d.name){alert('Укажите название');return}
-  if(i<0)db.orgs.push(Object.assign({id:'o'+Date.now().toString(36)},d));else Object.assign(db.orgs[i],d);save();closeM()}
-function delOrg(i){if(!confirm('Удалить организацию? Контакты останутся.'))return;const id=db.orgs[i].id;db.people.forEach(p=>{if(p.orgId===id)p.orgId=''});db.orgs.splice(i,1);save();closeM()}
-function addLog(id){const t=$('#lt').value.trim();if(!t)return;const p=byId(id);(p.log=p.log||[]).push({d:$('#ld').value||today(),t});p.last=$('#ld').value||today();save();view(id)}
+  if(i<0)db.orgs.push(Object.assign({id:'o'+Date.now().toString(36),u:Date.now()},d));else Object.assign(db.orgs[i],d,{u:Date.now()});save();closeM()}
+function delOrg(i){if(!confirm('Удалить организацию? Контакты останутся.'))return;const id=db.orgs[i].id;db.people.forEach(p=>{if(p.orgId===id){p.orgId='';p.u=Date.now()}});db.del[id]=Date.now();db.orgs.splice(i,1);save();closeM()}
+function addLog(id){const t=$('#lt').value.trim();if(!t)return;const p=byId(id);(p.log=p.log||[]).push({d:$('#ld').value||today(),t});p.last=$('#ld').value||today();p.u=Date.now();save();view(id)}
 function edit(id){
   const p=id?byId(id):{};const o=db.people.filter(x=>x.id!==id).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
   const cb=(k,l)=>`<label style="margin:0"><input type="checkbox" data-k="${k}" style="width:auto" ${p[k]?'checked':''}> ${l}</label>`;const f=(k,l,t='input')=>t==='ta'?`<label>${l}</label><textarea data-k="${k}">${esc(p[k])}</textarea>`:`<label>${l}</label><input data-k="${k}" value="${esc(p[k])}">`;
@@ -270,9 +340,9 @@ function saveP(id){
   if(!d.name){alert('Укажите имя');return}
   let p=id?byId(id):null;
   if(!p){p={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),log:[]};db.people.push(p);p.added=today();if(!d.next){const t=new Date();t.setDate(t.getDate()+2);d.next=t.toISOString().slice(0,10);d.nextWhy=d.nextWhy||'Вернуться к знакомству в течение 2 суток'}}
-  Object.assign(p,d);const sc=[1,2,3,4].reduce((a,i)=>a+(+d['d'+i]||0),0);if([1,2,3,4].some(i=>d['d'+i]!=='')){p.hist=p.hist||[];const l=p.hist[p.hist.length-1];if(!l||l.s!==sc){const t=today();if(l&&l.d===t)l.s=sc;else p.hist.push({d:t,s:sc})}}save();closeM();render();
+  Object.assign(p,d);p.u=Date.now();const sc=[1,2,3,4].reduce((a,i)=>a+(+d['d'+i]||0),0);if([1,2,3,4].some(i=>d['d'+i]!=='')){p.hist=p.hist||[];const l=p.hist[p.hist.length-1];if(!l||l.s!==sc){const t=today();if(l&&l.d===t)l.s=sc;else p.hist.push({d:t,s:sc})}}save();closeM();render();
 }
-function delP(id){const p=byId(id);if(!confirm('Удалить «'+p.name+'» вместе с историей?'))return;db.people=db.people.filter(x=>x.id!==id);db.people.forEach(x=>{if(x.by===id)x.by=''});save();closeM();render()}
+function delP(id){const p=byId(id);if(!confirm('Удалить «'+p.name+'» вместе с историей?'))return;db.del[id]=Date.now();db.people=db.people.filter(x=>x.id!==id);db.people.forEach(x=>{if(x.by===id){x.by='';x.u=Date.now()}});save();closeM();render()}
 function open_(h){$('#sheet').innerHTML=h;$('#modal').classList.add('on');$('#modal').scrollTop=0}
 function closeM(){$('#modal').classList.remove('on');render()}
 function dl(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
@@ -283,8 +353,9 @@ function exportCsv(){
   const rows=[cols.map(x=>c(x[1])).join(';')].concat(db.people.map(p=>cols.map(([k])=>c(k==='by'?(byId(p.by)||{}).name:p[k])).join(';')));
   dl('сеть-контактов-'+today()+'.csv','\uFEFF'+rows.join('\n'),'text/csv');
 }
-function wipe(){if(confirm('Удалить все контакты без возможности восстановления?')&&confirm('Точно удалить?')){db={people:[]};save();render()}}
+function wipe(){if(confirm('Удалить все контакты без возможности восстановления?')&&confirm('Точно удалить?')){const t=Date.now(),D=Object.assign({},db.del);[...db.people,...db.orgs,...db.goals].forEach(x=>D[x.id]=t);db={people:[],goals:[],orgs:[],ladder:{},del:D,ladderU:t};save();render()}}
 load();render();
+setTimeout(()=>syncNow(true),600);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow(true)});
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 </script>
